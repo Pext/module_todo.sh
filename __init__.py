@@ -49,7 +49,7 @@ class Module(ModuleBase):
         return ["add", "addto", "append", "archive", "deduplicate", "rm", "depri", "do", "mv", "prepend", "pri", "replace"]
 
     def getCommands(self):
-        commandsText = []
+        commandList = []
 
         commandsStarted = False
 
@@ -70,10 +70,10 @@ class Module(ModuleBase):
 
                 lineData = strippedLine.split(" ")
                 for variation in lineData[0].split("|"):
-                    if variation in self.getSupportedCommands():
-                        commandsText.append(variation + " " + " ".join(lineData[1:]))
+                    for supportedCommand in self.getSupportedCommands():
+                        commandList.append([supportedCommand, variation + " " + " ".join(lineData[1:])])
 
-        return commandsText
+        return commandList
 
     def getEntries(self):
         entryList = []
