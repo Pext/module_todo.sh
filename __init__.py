@@ -31,10 +31,10 @@ class Module(ModuleBase):
 
         self.q = q
 
+        self.ANSIEscapeRegex = re.compile('(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]')
+
         self.getCommands()
         self.getEntries()
-
-        self.ANSIEscapeRegex = re.compile('(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]')
 
     def stop(self):
         pass
@@ -71,8 +71,8 @@ class Module(ModuleBase):
 
                 lineData = strippedLine.split(" ")
                 for variation in lineData[0].split("|"):
-                    for supportedCommand in self.getSupportedCommands():
-                        self.q.put([Action.addCommand, [supportedCommand, variation + " " + " ".join(lineData[1:])]])
+                    if variation in self.getSupportedCommands():
+                        self.q.put([Action.addCommand, [variation, variation + " " + " ".join(lineData[1:])]])
 
     def getEntries(self):
         commandOutput = self.ANSIEscapeRegex.sub('', self.call(["ls"], returnOutput=True)).splitlines()
@@ -122,7 +122,9 @@ class Module(ModuleBase):
             if printOnSuccess and message:
                 self.q.put([Action.addMessage, message])
 
-            self.q.put([Action.replaceEntryList, self.getEntries()])
+            # TODO: Only add new entry to list
+            self.q.put([Action.replaceEntryList, []])
+            self.getEntries()
 
             return message
         else:
