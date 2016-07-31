@@ -26,10 +26,13 @@ from pext_helpers import Action
 
 
 class Module(ModuleBase):
-    def __init__(self, binary, q):
+    def init(self, binary, q):
         self.binary = "todo.sh" if (binary is None) else binary
 
         self.q = q
+
+        self.getCommands()
+        self.getEntries()
 
         self.ANSIEscapeRegex = re.compile('(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]')
 
@@ -49,8 +52,6 @@ class Module(ModuleBase):
         return ["add", "addto", "append", "archive", "deduplicate", "rm", "depri", "do", "mv", "prepend", "pri", "replace"]
 
     def getCommands(self):
-        commandList = []
-
         commandsStarted = False
 
         # We will crash here if todo.sh is not installed.
@@ -71,22 +72,16 @@ class Module(ModuleBase):
                 lineData = strippedLine.split(" ")
                 for variation in lineData[0].split("|"):
                     for supportedCommand in self.getSupportedCommands():
-                        commandList.append([supportedCommand, variation + " " + " ".join(lineData[1:])])
-
-        return commandList
+                        self.q.put([Action.addCommand, [supportedCommand, variation + " " + " ".join(lineData[1:])]])
 
     def getEntries(self):
-        entryList = []
-
         commandOutput = self.ANSIEscapeRegex.sub('', self.call(["ls"], returnOutput=True)).splitlines()
 
         for line in commandOutput:
             if line == '--':
                 break
 
-            entryList.append([line, line])
-
-        return entryList
+            self.q.put([Action.addEntry, [line, line]])
 
     def getAllEntryFields(self, entryName):
         return ['']
