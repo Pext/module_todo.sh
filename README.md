@@ -4,11 +4,16 @@ front-end to the command-line version of todo-list manager
 [todo.txt](https://github.com/ginatrapani/todo.txt-cli/).
 
 # Dependencies
+## General
+todo.sh from https://github.com/ginatrapani/todo.txt-cli/
+
 ## Debian
 
     sudo apt-get install python3 python3-pexpect
 
-Also required: todo.sh from https://github.com/ginatrapani/todo.txt-cli/
+## Fedora
+
+    sudo dnf install python3 python3-pexpect
 
 # License
 GPLv3+.
