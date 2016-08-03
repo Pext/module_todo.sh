@@ -91,25 +91,31 @@ class Module(ModuleBase):
         for commandPart in command:
             sanitizedCommandList.append(quote(commandPart))
 
-        proc = pexpect.spawn('/bin/sh', ['-c', self.binary + " " + " ".join(sanitizedCommandList) + (" 2>/dev/null" if hideErrors else "")])
-        return self.processProcOutput(proc, printOnSuccess, hideErrors)
+        command = " ".join(sanitizedCommandList)
+        proc = pexpect.spawn('/bin/sh', ['-c', self.binary + " " + command + (" 2>/dev/null" if hideErrors else "")])
 
-    def processProcOutput(self, proc, printOnSuccess=False, hideErrors=False):
+        return self.processProcOutput(proc, command, printOnSuccess, hideErrors)
+
+    def processProcOutput(self, proc, command, printOnSuccess=False, hideErrors=False):
         result = proc.expect_exact([pexpect.EOF, pexpect.TIMEOUT, "(y/n)"], timeout=3)
         if result == 0:
             exitCode = proc.sendline("echo $?")
-        elif result == 1 and proc.before:
-            self.q.put([Action.addError, "Timeout error while running '{}'. This specific way of calling the command is most likely not supported yet by Pext.".format(" ".join(command))])
-            self.q.put([Action.addError, "Command output: {}".format(self.ANSIEscapeRegex.sub('', proc.before.decode("utf-8")))])
+        elif result == 1:
+            self.q.put([Action.addError, "Timeout error while running '{}'".format(command)])
+            if proc.before:
+                self.q.put([Action.addError, "Command output: {}".format(self.ANSIEscapeRegex.sub('', proc.before.decode("utf-8")))])
+
+            return None
         else:
             proc.setecho(False)
             self.proc = {'proc': proc,
+                         'command': command,
                          'type': Action.askQuestionDefaultNo,
                          'printOnSuccess': printOnSuccess,
                          'hideErrors': hideErrors}
             self.q.put([Action.askQuestionDefaultNo, proc.before.decode("utf-8")])
 
-            return
+            return None
 
         proc.close()
         exitCode = proc.exitstatus
@@ -128,7 +134,7 @@ class Module(ModuleBase):
 
             return message
         else:
-            self.q.put([Action.addError, message if message else "Error code {} running '{}'. More info may be logged to the console".format(str(exitCode), " ".join(command))])
+            self.q.put([Action.addError, message if message else "Error code {} running '{}'. More info may be logged to the console".format(str(exitCode), command)])
 
             return None
 
@@ -137,5 +143,5 @@ class Module(ModuleBase):
         self.proc['proc'].sendline('y' if response else 'n')
         self.proc['proc'].setecho(True)
 
-        self.processProcOutput(self.proc['proc'], printOnSuccess=self.proc['printOnSuccess'], hideErrors=self.proc['hideErrors'])
+        self.processProcOutput(self.proc['proc'], self.proc['command'], printOnSuccess=self.proc['printOnSuccess'], hideErrors=self.proc['hideErrors'])
 
