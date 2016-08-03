@@ -84,7 +84,7 @@ class Module(ModuleBase):
             self.q.put([Action.addEntry, [line, line]])
 
     def getAllEntryFields(self, entryName):
-        return ['']
+        return []
 
     def runCommand(self, command, printOnSuccess=False, hideErrors=False):
         sanitizedCommandList = []
