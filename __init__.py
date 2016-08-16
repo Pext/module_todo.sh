@@ -16,7 +16,7 @@
 import re
 
 from os.path import expanduser
-from subprocess import call, check_output, Popen, PIPE
+from subprocess import call, check_output
 from shlex import quote
 
 import pexpect
