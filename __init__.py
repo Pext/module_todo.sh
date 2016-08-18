@@ -72,7 +72,7 @@ class Module(ModuleBase):
                 lineData = strippedLine.split(" ")
                 for variation in lineData[0].split("|"):
                     if variation in self.getSupportedCommands():
-                        self.q.put([Action.addCommand, [variation, variation + " " + " ".join(lineData[1:])]])
+                        self.q.put([Action.addCommand, variation + " " + " ".join(lineData[1:])])
 
     def getEntries(self):
         commandOutput = self.ANSIEscapeRegex.sub('', self.call(["ls"], returnOutput=True)).splitlines()
@@ -81,12 +81,16 @@ class Module(ModuleBase):
             if line == '--':
                 break
 
-            self.q.put([Action.addEntry, [line, line]])
+            self.q.put([Action.addEntry, line])
 
-    def getAllEntryFields(self, entryName):
-        return []
+    def selectionMade(self, selection):
+        self.q.put([Action.copyToClipboard, selection[0]])
+        self.q.put([Action.close])
 
     def runCommand(self, command, printOnSuccess=False, hideErrors=False):
+        if command[0] not in self.getSupportedCommands():
+            return None
+
         sanitizedCommandList = []
         for commandPart in command:
             sanitizedCommandList.append(quote(commandPart))
