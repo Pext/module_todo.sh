@@ -3,6 +3,9 @@ This module allows [Pext](https://github.com/Pext/Pext) to be used as a
 front-end to the command-line version of todo-list manager
 [todo.txt](https://github.com/ginatrapani/todo.txt-cli/).
 
+# Supported flags
+- binary: Use a custom binary (default: "todo.sh") 
+
 # Dependencies
 ## General
 todo.sh from https://github.com/ginatrapani/todo.txt-cli/

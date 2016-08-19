@@ -26,8 +26,8 @@ from pext_helpers import Action
 
 
 class Module(ModuleBase):
-    def init(self, binary, q):
-        self.binary = "todo.sh" if (binary is None) else binary
+    def init(self, settings, q):
+        self.binary = "todo.sh" if ('binary' not in settings) else settings['binary']
 
         self.q = q
 
