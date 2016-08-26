@@ -33,30 +33,24 @@ class Module(ModuleBase):
 
         self.ANSIEscapeRegex = re.compile('(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]')
 
-        self.getCommands()
-        self.getEntries()
+        self._getCommands()
+        self._getEntries()
 
-    def stop(self):
-        pass
-
-    def getDataLocation(self):
-        return expanduser("~") + "/.todo/todo.txt"
-
-    def call(self, command, returnOutput=False):
+    def _call(self, command, returnOutput=False):
         if returnOutput:
             return check_output([self.binary] + command).decode("utf-8")
         else:
             call([self.binary] + command)
 
-    def getSupportedCommands(self):
+    def _getSupportedCommands(self):
         return ["add", "addto", "append", "archive", "deduplicate", "rm", "depri", "do", "mv", "prepend", "pri", "replace"]
 
-    def getCommands(self):
+    def _getCommands(self):
         commandsStarted = False
 
         # We will crash here if todo.sh is not installed.
         # TODO: Find a nice way to notify the user they need to install todo.sh
-        commandText = self.call(["-h"], returnOutput=True)
+        commandText = self._call(["-h"], returnOutput=True)
 
         for line in commandText.splitlines():
             strippedLine = line.lstrip()
@@ -71,11 +65,11 @@ class Module(ModuleBase):
 
                 lineData = strippedLine.split(" ")
                 for variation in lineData[0].split("|"):
-                    if variation in self.getSupportedCommands():
+                    if variation in self._getSupportedCommands():
                         self.q.put([Action.addCommand, variation + " " + " ".join(lineData[1:])])
 
-    def getEntries(self):
-        commandOutput = self.ANSIEscapeRegex.sub('', self.call(["ls"], returnOutput=True)).splitlines()
+    def _getEntries(self):
+        commandOutput = self.ANSIEscapeRegex.sub('', self._call(["ls"], returnOutput=True)).splitlines()
 
         for line in commandOutput:
             if line == '--':
@@ -83,12 +77,15 @@ class Module(ModuleBase):
 
             self.q.put([Action.addEntry, line])
 
+    def stop(self):
+        pass
+
     def selectionMade(self, selection):
         self.q.put([Action.copyToClipboard, selection[0]])
         self.q.put([Action.close])
 
     def runCommand(self, command, printOnSuccess=False, hideErrors=False):
-        if command[0] not in self.getSupportedCommands():
+        if command[0] not in self._getSupportedCommands():
             return None
 
         sanitizedCommandList = []
@@ -134,7 +131,7 @@ class Module(ModuleBase):
 
             # TODO: Only add new entry to list
             self.q.put([Action.replaceEntryList, []])
-            self.getEntries()
+            self._getEntries()
 
             return message
         else:
