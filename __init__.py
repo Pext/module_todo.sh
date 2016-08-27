@@ -22,7 +22,7 @@ from shlex import quote
 import pexpect
 
 from pext_base import ModuleBase
-from pext_helpers import Action
+from pext_helpers import Action, SelectionType
 
 
 class Module(ModuleBase):
@@ -132,11 +132,11 @@ class Module(ModuleBase):
 
     def selectionMade(self, selection):
         if len(selection) == 1:
-            if selection[0]["type"] == "command":
+            if selection[0]["type"] == SelectionType.command:
                 parts = selection[0]["value"].split(" ")
                 self._runCommand(parts)
                 self.q.put([Action.setSelection, []])
-            elif selection[0]["type"] == "entry":
+            elif selection[0]["type"] == SelectionType.entry:
                 self.q.put([Action.copyToClipboard, selection[0]["value"]])
                 self.q.put([Action.close])
 
