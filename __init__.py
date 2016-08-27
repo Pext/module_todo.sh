@@ -77,14 +77,7 @@ class Module(ModuleBase):
 
             self.q.put([Action.addEntry, line])
 
-    def stop(self):
-        pass
-
-    def selectionMade(self, selection):
-        self.q.put([Action.copyToClipboard, selection[0]])
-        self.q.put([Action.close])
-
-    def runCommand(self, command, printOnSuccess=False, hideErrors=False):
+    def _runCommand(self, command):
         if command[0] not in self._getSupportedCommands():
             return None
 
@@ -93,11 +86,11 @@ class Module(ModuleBase):
             sanitizedCommandList.append(quote(commandPart))
 
         command = " ".join(sanitizedCommandList)
-        proc = pexpect.spawn('/bin/sh', ['-c', self.binary + " " + command + (" 2>/dev/null" if hideErrors else "")])
+        proc = pexpect.spawn('/bin/sh', ['-c', self.binary + " " + command])
 
-        return self.processProcOutput(proc, command, printOnSuccess, hideErrors)
+        return self._processProcOutput(proc, command)
 
-    def processProcOutput(self, proc, command, printOnSuccess=False, hideErrors=False):
+    def _processProcOutput(self, proc, command):
         result = proc.expect_exact([pexpect.EOF, pexpect.TIMEOUT, "(y/n)"], timeout=3)
         if result == 0:
             exitCode = proc.sendline("echo $?")
@@ -111,9 +104,7 @@ class Module(ModuleBase):
             proc.setecho(False)
             self.proc = {'proc': proc,
                          'command': command,
-                         'type': Action.askQuestionDefaultNo,
-                         'printOnSuccess': printOnSuccess,
-                         'hideErrors': hideErrors}
+                         'type': Action.askQuestionDefaultNo}
             self.q.put([Action.askQuestionDefaultNo, proc.before.decode("utf-8")])
 
             return None
@@ -126,9 +117,6 @@ class Module(ModuleBase):
         self.q.put([Action.setFilter, ""])
 
         if exitCode == 0:
-            if printOnSuccess and message:
-                self.q.put([Action.addMessage, message])
-
             # TODO: Only add new entry to list
             self.q.put([Action.replaceEntryList, []])
             self._getEntries()
@@ -139,10 +127,23 @@ class Module(ModuleBase):
 
             return None
 
+    def stop(self):
+        pass
+
+    def selectionMade(self, selection):
+        if len(selection) == 1:
+            if selection[0]["type"] == "command":
+                parts = selection[0]["value"].split(" ")
+                self._runCommand(parts)
+                self.q.put([Action.setSelection, []])
+            elif selection[0]["type"] == "entry":
+                self.q.put([Action.copyToClipboard, selection[0]["value"]])
+                self.q.put([Action.close])
+
     def processResponse(self, response):
         self.proc['proc'].waitnoecho()
         self.proc['proc'].sendline('y' if response else 'n')
         self.proc['proc'].setecho(True)
 
-        self.processProcOutput(self.proc['proc'], self.proc['command'], printOnSuccess=self.proc['printOnSuccess'], hideErrors=self.proc['hideErrors'])
+        self._processProcOutput(self.proc['proc'], self.proc['command'])
 
