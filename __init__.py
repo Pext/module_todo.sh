@@ -33,8 +33,8 @@ class Module(ModuleBase):
 
         self.ANSIEscapeRegex = re.compile('(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]')
 
-        self._getCommands()
-        self._getEntries()
+        self._get_commands()
+        self._get_entries()
 
     def _call(self, command, returnOutput=False):
         if returnOutput:
@@ -42,10 +42,10 @@ class Module(ModuleBase):
         else:
             call([self.binary] + command)
 
-    def _getSupportedCommands(self):
+    def _get_supported_commands(self):
         return ["add", "addto", "append", "archive", "deduplicate", "rm", "depri", "do", "mv", "prepend", "pri", "replace"]
 
-    def _getCommands(self):
+    def _get_commands(self):
         commandsStarted = False
 
         # We will crash here if todo.sh is not installed.
@@ -65,20 +65,20 @@ class Module(ModuleBase):
 
                 lineData = strippedLine.split(" ")
                 for variation in lineData[0].split("|"):
-                    if variation in self._getSupportedCommands():
-                        self.q.put([Action.addCommand, variation + " " + " ".join(lineData[1:])])
+                    if variation in self._get_supported_commands():
+                        self.q.put([Action.add_command, variation + " " + " ".join(lineData[1:])])
 
-    def _getEntries(self):
+    def _get_entries(self):
         commandOutput = self.ANSIEscapeRegex.sub('', self._call(["ls"], returnOutput=True)).splitlines()
 
         for line in commandOutput:
             if line == '--':
                 break
 
-            self.q.put([Action.addEntry, line])
+            self.q.put([Action.add_entry, line])
 
-    def _runCommand(self, command):
-        if command[0] not in self._getSupportedCommands():
+    def _run_command(self, command):
+        if command[0] not in self._get_supported_commands():
             return None
 
         sanitizedCommandList = []
@@ -88,24 +88,24 @@ class Module(ModuleBase):
         command = " ".join(sanitizedCommandList)
         proc = pexpect.spawn('/bin/sh', ['-c', self.binary + " " + command])
 
-        return self._processProcOutput(proc, command)
+        return self._process_proc_output(proc, command)
 
-    def _processProcOutput(self, proc, command):
+    def _process_proc_output(self, proc, command):
         result = proc.expect_exact([pexpect.EOF, pexpect.TIMEOUT, "(y/n)"], timeout=3)
         if result == 0:
             exitCode = proc.sendline("echo $?")
         elif result == 1:
-            self.q.put([Action.addError, "Timeout error while running '{}'".format(command)])
+            self.q.put([Action.add_error, "Timeout error while running '{}'".format(command)])
             if proc.before:
-                self.q.put([Action.addError, "Command output: {}".format(self.ANSIEscapeRegex.sub('', proc.before.decode("utf-8")))])
+                self.q.put([Action.add_error, "Command output: {}".format(self.ANSIEscapeRegex.sub('', proc.before.decode("utf-8")))])
 
             return None
         else:
             proc.setecho(False)
             self.proc = {'proc': proc,
                          'command': command,
-                         'type': Action.askQuestionDefaultNo}
-            self.q.put([Action.askQuestionDefaultNo, proc.before.decode("utf-8")])
+                         'type': Action.ask_question_default_no}
+            self.q.put([Action.ask_question_default_no, proc.before.decode("utf-8")])
 
             return None
 
@@ -114,36 +114,36 @@ class Module(ModuleBase):
 
         message = self.ANSIEscapeRegex.sub('', proc.before.decode("utf-8")) if proc.before else ""
 
-        self.q.put([Action.setFilter, ""])
+        self.q.put([Action.set_filter, ""])
 
         if exitCode == 0:
             # TODO: Only add new entry to list
-            self.q.put([Action.replaceEntryList, []])
-            self._getEntries()
+            self.q.put([Action.replace_entry_list, []])
+            self._get_entries()
 
             return message
         else:
-            self.q.put([Action.addError, message if message else "Error code {} running '{}'. More info may be logged to the console".format(str(exitCode), command)])
+            self.q.put([Action.add_error, message if message else "Error code {} running '{}'. More info may be logged to the console".format(str(exitCode), command)])
 
             return None
 
     def stop(self):
         pass
 
-    def selectionMade(self, selection):
+    def selection_made(self, selection):
         if len(selection) == 1:
             if selection[0]["type"] == SelectionType.command:
                 parts = selection[0]["value"].split(" ")
-                self._runCommand(parts)
-                self.q.put([Action.setSelection, []])
+                self._run_command(parts)
+                self.q.put([Action.set_selection, []])
             elif selection[0]["type"] == SelectionType.entry:
-                self.q.put([Action.copyToClipboard, selection[0]["value"]])
+                self.q.put([Action.copy_to_clipboard, selection[0]["value"]])
                 self.q.put([Action.close])
 
-    def processResponse(self, response):
+    def process_response(self, response):
         self.proc['proc'].waitnoecho()
         self.proc['proc'].sendline('y' if response else 'n')
         self.proc['proc'].setecho(True)
 
-        self._processProcOutput(self.proc['proc'], self.proc['command'])
+        self._process_proc_output(self.proc['proc'], self.proc['command'])
 
