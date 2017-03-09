@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# Copyright (C) 2016 - 2017 Sylvia van Os <sylvia@hackerchick.me>
+#
 # Pext todo.sh module is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -92,15 +94,13 @@ class Module(ModuleBase):
 
     def _process_proc_output(self, proc, command):
         result = proc.expect_exact([pexpect.EOF, pexpect.TIMEOUT, "(y/n)"], timeout=3)
-        if result == 0:
-            exitCode = proc.sendline("echo $?")
-        elif result == 1:
+        if result == 1:
             self.q.put([Action.add_error, "Timeout error while running '{}'".format(command)])
             if proc.before:
                 self.q.put([Action.add_error, "Command output: {}".format(self.ANSIEscapeRegex.sub('', proc.before.decode("utf-8")))])
 
             return None
-        else:
+        elif result == 2:
             proc.setecho(False)
             self.proc = {'proc': proc,
                          'command': command,
@@ -118,9 +118,6 @@ class Module(ModuleBase):
 
         if exitCode == 0:
             # TODO: Only add new entry to list
-            self.q.put([Action.replace_entry_list, []])
-            self._get_entries()
-
             return message
         else:
             self.q.put([Action.add_error, message if message else "Error code {} running '{}'. More info may be logged to the console".format(str(exitCode), command)])
@@ -139,6 +136,9 @@ class Module(ModuleBase):
             elif selection[0]["type"] == SelectionType.entry:
                 self.q.put([Action.copy_to_clipboard, selection[0]["value"]])
                 self.q.put([Action.close])
+
+            self._get_commands()
+            self._get_entries()
 
     def process_response(self, response):
         self.proc['proc'].waitnoecho()
