@@ -50,9 +50,11 @@ class Module(ModuleBase):
     def _get_commands(self):
         commandsStarted = False
 
-        # We will crash here if todo.sh is not installed.
-        # TODO: Find a nice way to notify the user they need to install todo.sh
-        commandText = self._call(["-h"], returnOutput=True)
+        try:
+            commandText = self._call(["-h"], returnOutput=True)
+        except FileNotFoundError:
+            self.q.put([Action.critical_error, "Could not find todo.sh. Please ensure it is in your $PATH"])
+            return
 
         for line in commandText.splitlines():
             strippedLine = line.lstrip()
