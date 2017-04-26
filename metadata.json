@@ -7,5 +7,10 @@
   "git_urls": [
     "https://github.com/Pext/pext_module_todo.sh",
     "https://notabug.org/Pext/pext_module_todo.sh"
-  ]
+  ],
+  "settings": [{
+    "name": binary",
+    "description": "Binary to use for todo.sh operations",
+    "default": "todo.sh"
+  }]
 }
