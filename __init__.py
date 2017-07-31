@@ -15,13 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import re
-
 from os.path import expanduser
-from subprocess import call, check_output
-from shlex import quote
-
-import pexpect
 
 from pext_base import ModuleBase
 from pext_helpers import Action, SelectionType
@@ -29,102 +23,112 @@ from pext_helpers import Action, SelectionType
 
 class Module(ModuleBase):
     def init(self, settings, q):
-        self.binary = "todo.sh" if ('binary' not in settings) else settings['binary']
-
         self.q = q
 
-        self.ANSIEscapeRegex = re.compile('(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]')
+        self.todo_location = expanduser("~/todo.txt") if ('todo_file' not in settings) else expanduser(settings['todo_file'])
+        self.done_location = expanduser("~/done.txt") if ('done_file' not in settings) else expanduser(settings['done_file'])
+
+        self.entries = []
+        self.actively_editing = None
 
         self._get_commands()
         self._get_entries()
 
-    def _call(self, command, returnOutput=False):
-        if returnOutput:
-            return check_output([self.binary] + command).decode("utf-8")
-        else:
-            call([self.binary] + command)
-
     def _get_supported_commands(self):
-        return ["add", "addto", "append", "archive", "deduplicate", "rm", "depri", "do", "mv", "prepend", "pri", "replace"]
+        return ["add", "addto", "archive", "edit", "rm", "prepend", "replace"]
 
     def _get_commands(self):
-        commandsStarted = False
-
-        try:
-            commandText = self._call(["-h"], returnOutput=True)
-        except FileNotFoundError:
-            self.q.put([Action.critical_error, "Could not find todo.sh. Please ensure it is in your $PATH"])
-            return
-
-        for line in commandText.splitlines():
-            strippedLine = line.lstrip()
-            if not commandsStarted:
-                if strippedLine.startswith("Actions:"):
-                    commandsStarted = True
-
-                continue
-            else:
-                if strippedLine == '':
-                    break
-
-                lineData = strippedLine.split(" ")
-                for variation in lineData[0].split("|"):
-                    if variation in self._get_supported_commands():
-                        self.q.put([Action.add_command, variation + " " + " ".join(lineData[1:])])
+        self.q.put([Action.replace_command_list, self._get_supported_commands()])
 
     def _get_entries(self):
-        commandOutput = self.ANSIEscapeRegex.sub('', self._call(["ls"], returnOutput=True)).splitlines()
+         with open(self.todo_location) as todo_file:
+            for line in todo_file:
+                line = line.strip()
+                if line:
+                    self.entries.append(line)
+                    self.q.put([Action.add_entry, "{} {}".format(len(self.entries), line)])
 
-        for line in commandOutput:
-            if line == '--':
-                break
+    def _reload_ui_list(self):
+        self.q.put([Action.replace_entry_list, []])
+        for number, entry in enumerate(self.entries):
+            self.q.put([Action.add_entry, "{} {}".format(number + 1, entry)])
 
-            self.q.put([Action.add_entry, line])
+    def _get_entry_by_id(self, number):
+        return self.entries[int(number) - 1]
+
+    def _set_entry_by_id(self, number, value):
+        self.entries[int(number) - 1] = value
 
     def _run_command(self, command):
         if command[0] not in self._get_supported_commands():
             return None
 
-        sanitizedCommandList = []
-        for commandPart in command:
-            sanitizedCommandList.append(quote(commandPart))
+        # Set number and loaded_entry for commands that use an entry
+        if command[0] in ["addto", "archive", "edit", "rm", "replace"]:
+            number = int(command[1]) - 1
 
-        command = " ".join(sanitizedCommandList)
-        proc = pexpect.spawn('/bin/sh', ['-c', self.binary + " " + command])
+            try:
+                loaded_entry = self.entries[number]
+            except Exception as e:
+                print(e)
+                self.q.put([Action.add_error, "There is no entry with id {}".format(command[1])])
+                return
+ 
+        if command[0] == "add":
+            entry = " ".join(command[1:])
+            self.entries.append(entry)
 
-        return self._process_proc_output(proc, command)
+            with open(self.todo_location, 'a') as todo_file:
+                todo_file.write(entry + '\n')
 
-    def _process_proc_output(self, proc, command):
-        result = proc.expect_exact([pexpect.EOF, pexpect.TIMEOUT, "(y/n)"], timeout=3)
-        if result == 1:
-            self.q.put([Action.add_error, "Timeout error while running '{}'".format(command)])
-            if proc.before:
-                self.q.put([Action.add_error, "Command output: {}".format(self.ANSIEscapeRegex.sub('', proc.before.decode("utf-8")))])
+        elif command[0] == "addto":
+            entry = "{} {}".format(loaded_entry, " ".join(command[2:]))
+            self.entries[number] = entry
 
-            return None
-        elif result == 2:
-            proc.setecho(False)
-            self.proc = {'proc': proc,
-                         'command': command,
-                         'type': Action.ask_question_default_no}
-            self.q.put([Action.ask_question_default_no, proc.before.decode("utf-8")])
+            with open(self.todo_location, 'w') as todo_file:
+                todo_file.writelines(entry + '\n' for entry in self.entries)
 
-            return None
+        elif command[0] == "archive":
+            self.entries.remove(loaded_entry)
+            
+            with open(self.done_location, 'a') as done_file:
+                done_file.write(loaded_entry + '\n')
+            
+            with open(self.todo_location, 'w') as todo_file:
+                todo_file.writelines(entry + '\n' for entry in self.entries)
 
-        proc.close()
-        exitCode = proc.exitstatus
+        elif command[0] == "edit":
+            self.actively_editing = number
+            self.q.put([Action.ask_input, "Editing {}: {}".format(number + 1, loaded_entry), loaded_entry])
 
-        message = self.ANSIEscapeRegex.sub('', proc.before.decode("utf-8")) if proc.before else ""
+        elif command[0] == "rm":
+            self.entries.remove(loaded_entry)
 
-        self.q.put([Action.set_filter, ""])
+            with open(self.todo_location, 'w') as todo_file:
+                todo_file.writelines(entry + '\n' for entry in self.entries)
 
-        if exitCode == 0:
-            # TODO: Only add new entry to list
-            return message
-        else:
-            self.q.put([Action.add_error, message if message else "Error code {} running '{}'. More info may be logged to the console".format(str(exitCode), command)])
+        elif command[0] == "prepend":
+            entry = " ".join(command[1:])
+            self.entries = [entry] + self.entries
 
-            return None
+            with open(self.todo_location, 'w') as todo_file:
+                todo_file.writelines(entry + '\n' for entry in self.entries)
+
+        elif command[0] == "replace":
+            new_text = " ".join(command[2:])
+            self.entries[number] = new_text
+
+            with open(self.todo_location, 'w') as todo_file:
+                todo_file.writelines(entry + '\n' for entry in self.entries)
+
+    def process_response(self, response):
+        if response is not None:
+            self.entries[self.actively_editing] = response
+
+            with open(self.todo_location, 'w') as todo_file:
+                todo_file.writelines(entry + '\n' for entry in self.entries)
+
+            self._reload_ui_list()
 
     def stop(self):
         pass
@@ -139,13 +143,5 @@ class Module(ModuleBase):
                 self.q.put([Action.copy_to_clipboard, selection[0]["value"]])
                 self.q.put([Action.close])
 
+            self._reload_ui_list()
             self._get_commands()
-            self._get_entries()
-
-    def process_response(self, response):
-        self.proc['proc'].waitnoecho()
-        self.proc['proc'].sendline('y' if response else 'n')
-        self.proc['proc'].setecho(True)
-
-        self._process_proc_output(self.proc['proc'], self.proc['command'])
-

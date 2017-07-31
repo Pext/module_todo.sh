@@ -1,7 +1,7 @@
 {
-  "name": "todo.sh",
+  "name": "todo",
   "developer": "Sylvia van Os (Pext lead developer)",
-  "description": "Allows Pext to do todo-list management through todo.sh",
+  "description": "Allows Pext to do todo.txt-style todo-list management",
   "homepage": "https://pext.hackerchick.me/",
   "license": "GPL-3.0+",
   "git_urls": [
@@ -9,8 +9,12 @@
     "https://notabug.org/Pext/pext_module_todo.sh"
   ],
   "settings": [{
-    "name": "binary",
-    "description": "Binary to use for todo.sh operations",
-    "default": "todo.sh"
+    "name": "todo_file",
+    "description": "Path to todo.txt",
+    "default": "~/todo.txt"
+  }, {
+    "name": "done_file",
+    "description": "Path to archive (done.txt)",
+    "default": "~/done.txt"
   }]
 }
