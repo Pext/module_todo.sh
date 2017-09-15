@@ -28,6 +28,17 @@ class Module(ModuleBase):
         self.todo_location = expanduser("~/todo.txt") if ('todo_file' not in settings) else expanduser(settings['todo_file'])
         self.done_location = expanduser("~/done.txt") if ('done_file' not in settings) else expanduser(settings['done_file'])
 
+        # Ensure files exist
+        try:
+            open(self.todo_location, 'x')
+        except FileExistsError:
+            pass
+
+        try:
+            open(self.done_location, 'x')
+        except FileExistsError:
+            pass
+
         self.entries = []
         self.actively_editing = None
 
