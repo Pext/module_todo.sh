@@ -16,5 +16,10 @@
     "name": "done_file",
     "description": "Path to archive (done.txt)",
     "default": "~/done.txt"
-  }]
+  }],
+  "platforms": [
+    "Linux",
+    "Darwin",
+    "Windows"
+  ]
 }
