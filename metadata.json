@@ -5,8 +5,7 @@
   "homepage": "https://pext.hackerchick.me/",
   "license": "GPL-3.0+",
   "git_urls": [
-    "https://github.com/Pext/pext_module_todo"
-    
+    "https://github.com/Pext/pext_module_todo" 
   ],
   "settings": [{
     "name": "todo_file",
