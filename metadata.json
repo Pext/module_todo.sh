@@ -1,4 +1,5 @@
 {
+  "id": "pext.module.todo",
   "name": "Todo List",
   "developer": "Sylvia van Os (Pext lead developer)",
   "description": "Allows Pext to do todo.txt-style todo-list management",
